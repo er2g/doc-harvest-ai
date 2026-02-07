@@ -1,45 +1,75 @@
-# Doc Harvest AI
+# Fetch&Snatch
 
-End-to-end Turkish document processing pipeline: Google Drive ingestion, OCR extraction, and Gemini-based analysis.
+Google Drive klasörlerini indirip GPU hızlandırmalı OCR ile metne dönüştüren ve Vertex AI Gemini modelleriyle analiz eden uçtan uca Türkçe belge işleme hattı.
 
-## Pipeline
+---
 
-1. Download folder content from Google Drive (service account)
-2. Convert documents/images to text with EasyOCR (+ GPU when available)
-3. Analyze OCR text in chunks with Vertex AI Gemini
-4. Produce structured outputs and summary reports
+## 🚀 Özellikler
+- **Drive İndirme** – Service account ile Google Drive klasörlerini yerel diske alır.
+- **GPU / CPU OCR** – PDF, PPTX ve görüntüleri EasyOCR + PyTorch ile Türkçe metne dönüştürür.
+- **Gemini Analizi** – OCR çıktılarındaki `.txt` dosyalarını Vertex AI (Gemini) modelleriyle parça parça analiz eder, JSON + özet rapor üretir.
+- **Web UI** – FastAPI + tek sayfalık arayüzle tüm adımları tarayıcıdan yönet, logları canlı izle.
+- **CLI araçları** – Her adım bağımsız Python betikleriyle komut satırından da tetiklenebilir.
 
-## Features
+---
 
-- Drive folder crawling and export handling
-- OCR for PDF, PPTX, and image files
-- Web UI for run control and live logs
-- CLI scripts for each pipeline stage
+---
 
-## Requirements
+## 🔧 Kurulum
+1. **Python 3.9+** gereklidir.
+2. İsteğe bağlı sanal ortam oluşturun.
+3. Gerekli paketleri yükleyin:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. OCR için **Poppler** kurup `pdftoppm` aracını PATH'e ekleyin.
+5. (Opsiyonel) PPTX → PDF dönüşümü için `pip install aspose.slides` (lisanssız kullanım filigran ekleyebilir).
+6. Vertex AI tarafında `google-cloud-aiplatform` kullanabilmek için proje ve servis hesabına uygun yetkileri (ör. `Vertex AI User`) atayın ve Gemini model erişimini açın.
 
-- Python 3.9+
-- `pip install -r requirements.txt`
-- Google Cloud credentials for Drive + Vertex AI
-- Optional CUDA-enabled PyTorch setup for GPU OCR
+> **Not:** GPU kullanmak için CUDA destekli PyTorch kurulumunu kendi donanımınıza uygun komutla yükleyin. (`https://pytorch.org/get-started/locally/`)
 
-## CLI Examples
+---
 
-Download from Drive:
+## ⚙️ Komut satırı kullanımı
 
+### 1. Drive klasörü indir
 ```bash
-python drive_fetch.py <FOLDER_ID> <OUTPUT_DIR> --service-account /path/to/sa.json
+python drive_fetch.py <DRIVE_FOLDER_ID> <HEDEF_KLASOR> \
+  --service-account /path/drive_sa.json --verbose
+```
+`--overwrite` mevcut dosyaları yeniden indirir.
+
+### 2. OCR çalıştır
+```bash
+python gpu_turkish_ocr.py <KAYNAK_KLASOR> \
+  --output <CIKTI_KLASORU> --device auto --dpi 220 --verbose
+```
+- `--device`: `auto | cuda | cpu`
+- `--force`: var olan `.txt` dosyalarını yeniden üretir.
+
+### 3. Gemini analizi (Vertex AI)
+```bash
+python analyze_ocr_outputs.py <OCR_CIKTILARI> \
+  --prompt "Belgedeki tıbbi terimleri listele" \
+  --service-account /path/gemini_sa.json \
+  --model gemini-1.5-flash-002 \
+  --region us-central1 --verbose
+```
+- Çıktılar `<OCR_CIKTILARI>/analysis_outputs` altında `.analysis.json`, `.analysis.txt` ve `combined_report.md` olarak oluşturulur.
+- `--chunk-size` ve `--chunk-overlap` değerleri ile metin parçalama ayarlanabilir (varsayılan 6000/300).
+
+---
+
+## 🌐 Web arayüzü
+FastAPI sunucusunu başlatın:
+```bash
+uvicorn web_app.backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+Tarayıcıdan `http://localhost:8000` adresine gidin. Panelden sırayla Drive → OCR → Gemini akışını başlatabilir, job loglarını canlı izleyebilir ve gerekirse iptal edebilirsiniz.
+
+WSL üzerinden Windows tarayıcısına servis vermek için örnek script:
+```bash
+./start_server_wsl.sh 8000
 ```
 
-Run OCR:
-
-```bash
-python gpu_turkish_ocr.py <SOURCE_DIR>
-```
-
-## Project Layout
-
-- `drive_fetch.py`: Drive downloader
-- `gpu_turkish_ocr.py`: OCR stage
-- `analyze_ocr_outputs.py`: Gemini analysis stage
-- `web_app/`: browser-based control panel
+---
